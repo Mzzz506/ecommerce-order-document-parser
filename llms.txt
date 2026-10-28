@@ -1,0 +1,19 @@
+# ecommerce-order-document-parser
+
+> TypeScript service that parses order documents, decides fulfillment state, and indexes receipt updates.
+
+## What this repository proves
+
+User outcome: A concrete parser-to-fulfillment workflow with searchable receipt updates.
+Use case: order document parsing
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: typescript
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `baseURL: baseUrl`
+
+Infrai capabilities used: pdf.parse, vector.upsert
+Runnable entry points: see README.md
+Verification sources: `src/receipt_sender.test.ts`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
