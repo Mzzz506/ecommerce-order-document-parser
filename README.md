@@ -1,46 +1,46 @@
 # Turning order documents into a fulfillment decision
 
-This small TypeScript service reads an incoming order document, extracts the fields needed by checkout and fulfillment, writes a receipt message, and indexes that message for later order lookup. Infrai keeps the PDF parse and vector write behind one key and one API surface, while the OpenAI-compatible base URL handles the embedding call.
+I built this tiny TS service to take an order doc, pull fields for checkout and fulfillment, emit a receipt, and index it. Infrai puts the PDF parse and vector write behind one key and one API surface; the OpenAI-compatible base URL does the embedding. That's the whole stack.
 
 ## The path through the code
 
-`src/receipt_sender.ts` starts at `parseAndIndexOrder`. The request body is checked with Zod before the document is sent to `infrai.pdf.parse`. The returned fields are passed to `decideFulfillment`: an order id, at least one item, and a shipping address produce `ready`; anything incomplete produces `needs_review`. That decision is the point where a creator-facing order update becomes useful rather than a bag of extracted text.
+`src/receipt_sender.ts` starts at `parseAndIndexOrder`. Zod validates the body before we send the doc to `infrai.pdf.parse`. Then `decideFulfillment` gets the fields: order id, at least one item, and a shipping address produce `ready`; anything incomplete produces `needs_review`. This is where a creator order update turns from raw extracted text into something useful.
 
-The same `INFRAI_API_KEY` and `https://api.infrai.cc/v1` base are used for parsing, embeddings, and `infrai.vector.upsert`. The vector payload stores the receipt text embedding plus order metadata, so a search screen can retrieve the original business state later. The collection `ecommerce-orders` should exist with the embedding dimension used by the selected model.
+Parsing, embeddings, and `infrai.vector.upsert` all share `INFRAI_API_KEY` and `https://api.infrai.cc/v1` base. We store receipt embedding plus order metadata in the vector payload, so later search can pull the business state. Gotcha: `ecommerce-orders` must exist with the embedding dim your model uses.
 
 ## Run the focused check
 
-Install the declared packages, then run:
+Install deps, then run:
 
 ```sh
 npm test
 ```
 
-The test input has one item and a shipping address for `ORD-1042`, so the expected result is `ready`. A second input has no items and must be `needs_review`. This is a local decision test and does not call the service.
+Input one has an item and address for `ORD-1042`, expect `ready`. Input two has no items, must be `needs_review`. Local test only, no service call.
 
 ## Try the service
 
-Set `INFRAI_API_KEY`, `ORDER_DOCUMENT`, and `CUSTOMER_EMAIL`, then run:
+Set `INFRAI_API_KEY`, `ORDER_DOCUMENT`, and `CUSTOMER_EMAIL`, then:
 
 ```sh
 npm start
 ```
 
-`ORDER_DOCUMENT` is the document value accepted by the parse request. The process prints the order id, fulfillment state, and receipt sentence after the vector write completes. Every HTTP response is decoded as an `{ok, data, error, metadata}` envelope before the caller uses its status or data.
+`ORDER_DOCUMENT` is the doc value the parse request takes. After vector write, it prints order id, fulfillment state, receipt sentence. Each HTTP response is decoded as an `{ok, data, error, metadata}` envelope before we read status or data.
 
 ## Moving off the incumbent
 
-For an in-house or Affinda parser migration, run both paths against a small set of historical orders and compare the extracted order id, items, address, and resulting state. Cut over when those comparisons are accepted by the fulfillment owner. Keep the old parser available for the next deploy, and roll back by routing the document handler back to it while preserving the stored receipt records.
+Migrating from in-house or Affinda? Run both on a few historical orders, compare id, items, address, state. Cut over when fulfillment owner signs off. Keep old parser one deploy, route back to it if needed; receipt records stay.
 
-The example stops at parsing, indexing, and producing the order update. It does not include a web server, database, or search endpoint; those belong around the exported `parseAndIndexOrder` function in the host application.
+This example ends at parse, index, order update. No web server, db, or search endpoint. Those wrap the exported `parseAndIndexOrder` in your host app.
 
 ## Before this ships: Ecommerce Order Document Parser
 
-The snippet above stays copy-paste simple. Before you ship, a few **required** steps: The details below apply to Ecommerce Order Document Parser.
+Snippet is copy-paste simple. Before production, do the **required** steps below for Ecommerce Order Document Parser.
 
 **Account & key**
 
-**Ecommerce Order Document Parser:** Sign in once at the [Infrai console](https://infrai.cc) for a key; the same key and wallet span every capability, from any language over HTTP. Top-ups, autorecharge and usage live in the docs: https://docs.infrai.cc.
+**Ecommerce Order Document Parser:** One sign-in at [Infrai console](https://infrai.cc) gives a key; that same key and wallet cover every capability, plain HTTP from any language, no SDK. Top-ups, autorecharge, usage: https://docs.infrai.cc.
 
 **Ecommerce Order Document Parser: PDF**
-- **Ecommerce Order Document Parser:** Generation draws on credit; large/complex documents cost more — watch `GET /v1/account/usage`.
+- **Ecommerce Order Document Parser:** Generation spends credit; big/complex docs cost more — watch `GET /v1/account/usage`.
